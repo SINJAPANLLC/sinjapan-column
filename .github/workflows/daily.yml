@@ -1,47 +1,42 @@
-name: daily-generate
+name: Daily Generate
+
+on:
+  workflow_dispatch:
+  schedule:
+    # JST 09:10 = UTC 00:10
+    - cron: "10 0 * * *"
 
 permissions:
   contents: write
 
-on:
-  schedule:
-    - cron: "0 22 * * *" # JST 07:00（UTC 22:00）
-  workflow_dispatch:
-
 jobs:
-  build:
+  generate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - name: Use Node
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Install dependencies
+      - name: Install deps
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
 
-      - name: Generate article (OpenAI)
+      - name: Generate 10 articles (weighted random)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: node scripts/generate.mjs --n 1
-
-      - name: Commit & Push
+          OPENAI_MODEL: gpt-4.1-mini
         run: |
-          git config user.name "sinjapan-bot"
-          git config user.email "bot@sinjapan.work"
+          node scripts/generate.mjs --n 10
 
-          git add public/feed/index.json public/feed/articles/**/*.json public/**/*.html public/sitemap.xml || true
-          git commit -m "daily: generate" || exit 0
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 競合回避：先にリモート取り込む
-          git pull --rebase origin main
-
-          git push origin main
+          git add public/feed/index.json public/feed/articles public/**/*.html public/sitemap.xml
+          git commit -m "daily: generate 10 articles" || true
+          git pull --rebase
+          git push
