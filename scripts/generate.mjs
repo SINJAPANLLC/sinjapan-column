@@ -1,33 +1,91 @@
-function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canonicalUrl}) {
-  const tagHtml = (tags||[]).slice(0,8).map(t=>`<a class="tag" href="#" onclick="return false;">${t}</a>`).join("");
-  const can = canonicalUrl ? `<link rel="canonical" href="${canonicalUrl}">` : "";
+function wrapHtml({
+  title,
+  description,
+  bodyHtml,
+  isoDate,
+  category,
+  tags,
+  canonicalUrl,
+  related = [], // [{title, url, date, category, description}]
+}) {
+  const esc = (s) =>
+    String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+
+  const tagHtml = (tags || [])
+    .slice(0, 12)
+    .map((t) => `<span class="tag">${esc(t)}</span>`)
+    .join("");
+
+  const can = canonicalUrl ? `<link rel="canonical" href="${esc(canonicalUrl)}">` : "";
+
+  const jsonLd = canonicalUrl
+    ? `<script type="application/ld+json">${JSON.stringify(
+        {
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: title,
+          description: description,
+          datePublished: isoDate,
+          dateModified: isoDate,
+          mainEntityOfPage: canonicalUrl,
+          author: { "@type": "Organization", name: "SIN JAPAN" },
+          publisher: { "@type": "Organization", name: "SIN JAPAN" },
+        },
+        null,
+        0
+      )}</script>`
+    : "";
+
+  const relatedHtml = (related || [])
+    .slice(0, 4)
+    .map(
+      (x) => `
+      <a class="relCard" href="${esc(x.url)}" target="_blank" rel="noopener">
+        <div class="relTitle">${esc(x.title)}</div>
+        <div class="relMeta">${esc(x.date || "")}${x.category ? " ・ " + esc(x.category) : ""}</div>
+        <div class="relDesc">${esc(x.description || "")}</div>
+      </a>
+    `
+    )
+    .join("");
 
   return `<!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>${title} | SIN JAPAN 公式コラム</title>
-  <meta name="description" content="${description}">
+  <title>${esc(title)} | SIN JAPAN 公式コラム</title>
+  <meta name="description" content="${esc(description)}">
   ${can}
+  ${jsonLd}
 
   <meta property="og:type" content="article">
-  <meta property="og:title" content="${title}">
-  <meta property="og:description" content="${description}">
+  <meta property="og:title" content="${esc(title)}">
+  <meta property="og:description" content="${esc(description)}">
   <meta property="og:site_name" content="SIN JAPAN 公式コラム">
 
   <style>
     :root{
-      --bg: #070b18;
+      --bg0:#050816;
+      --bg1:#0b1430;
+      --card: rgba(255,255,255,.95);
       --ink: #0b1220;
       --muted: rgba(11,18,32,.72);
-      --card: rgba(255,255,255,.92);
       --line: rgba(255,255,255,.14);
-      --shadow: 0 30px 90px rgba(2,6,23,.32);
-      --shadow2: 0 18px 54px rgba(2,6,23,.16);
-      --r: 20px;
-    }
+      --r: 22px;
 
+      --shadow: 0 30px 90px rgba(2,6,23,.30);
+      --shadow2: 0 18px 54px rgba(2,6,23,.14);
+
+      --max: 1020px;
+      --read: 720px;
+      --a: #0a5bd3;
+    }
     *{box-sizing:border-box}
     html,body{margin:0;padding:0}
     body{
@@ -36,15 +94,15 @@ function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canoni
       background:
         radial-gradient(900px 420px at 15% -5%, rgba(56,189,248,.28), transparent 60%),
         radial-gradient(1000px 520px at 90% 10%, rgba(59,130,246,.30), transparent 62%),
-        linear-gradient(180deg, #050816, #0b1430 40%, #f6f8ff 140%);
+        linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #f6f8ff 140%);
       min-height:100vh;
     }
 
-    .wrap{max-width:980px;margin:0 auto;padding:22px 16px 56px}
+    .wrap{max-width:var(--max);margin:0 auto;padding:22px 16px 78px}
 
-    /* top hero */
+    /* ===== HERO ===== */
     .hero{
-      border-radius: calc(var(--r) + 6px);
+      border-radius: calc(var(--r) + 10px);
       overflow:hidden;
       position:relative;
       background:
@@ -74,7 +132,7 @@ function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canoni
     }
     .h1{
       margin:10px 0 10px;
-      font-size:30px;line-height:1.18;letter-spacing:-.02em;
+      font-size:34px;line-height:1.16;letter-spacing:-.02em;
     }
     .meta{
       display:flex;gap:10px;flex-wrap:wrap;align-items:center;
@@ -83,14 +141,12 @@ function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canoni
     .dot{opacity:.6}
     .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
     .tag{
-      text-decoration:none;
       border:1px solid var(--line);
       background:rgba(255,255,255,.10);
       color:#fff;
       padding:6px 10px;border-radius:999px;
-      font-size:12px;font-weight:800;
+      font-size:12px;font-weight:900;
     }
-    .tag:hover{background:rgba(255,255,255,.16)}
     .crumb{
       margin-top:14px;
       display:flex;gap:10px;flex-wrap:wrap;align-items:center;
@@ -98,15 +154,15 @@ function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canoni
     .crumb a{
       color:rgba(255,255,255,.92);
       text-decoration:none;
-      font-weight:800;
+      font-weight:900;
       border:1px solid var(--line);
       background:rgba(255,255,255,.08);
-      padding:8px 12px;border-radius:14px;
+      padding:9px 12px;border-radius:14px;
     }
     .crumb a:hover{background:rgba(255,255,255,.14)}
     .crumb .ghost{opacity:.82}
 
-    /* article card */
+    /* ===== ARTICLE CARD ===== */
     .card{
       margin-top:-18px;
       border-radius: var(--r);
@@ -115,44 +171,156 @@ function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canoni
       border:1px solid rgba(0,0,0,.06);
       overflow:hidden;
     }
-    .content{padding:18px 18px 8px}
-    .content p{line-height:1.92;color:rgba(11,18,32,.86);margin:12px 0}
+
+    /* ===== TOC ===== */
+    .toc{
+      max-width:var(--read);
+      margin:18px auto 0;
+      background:#fff;
+      border:1px solid rgba(0,0,0,.06);
+      border-radius:16px;
+      padding:14px 16px;
+    }
+    .tocTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .tocTitle{margin:0;font-size:13px;color:rgba(11,18,32,.78);font-weight:1000}
+    .tocBtn{
+      border:1px solid rgba(0,0,0,.10);
+      background:#fff;
+      border-radius:12px;
+      padding:8px 10px;
+      font-size:12px;
+      cursor:pointer;
+      font-weight:900;
+    }
+    .tocList{margin:10px 0 0;padding:0;list-style:none}
+    .tocList a{
+      display:block;
+      padding:7px 0;
+      text-decoration:none;
+      color:var(--a);
+      font-size:13px;
+      font-weight:900;
+      border-bottom:1px dashed rgba(0,0,0,.06);
+    }
+    .tocList li:last-child a{border-bottom:none}
+    .tocList a:hover{text-decoration:underline}
+
+    /* ===== CONTENT (READABILITY) ===== */
+    .content{
+      max-width:var(--read);
+      margin:0 auto;
+      padding:26px 22px 10px;
+    }
+    .content p{
+      line-height:2.0;
+      letter-spacing:.02em;
+      color:rgba(11,18,32,.86);
+      margin:14px 0;
+      font-size:15px;
+    }
     .content h2{
-      margin:24px 0 10px;
-      font-size:18px;
+      margin:34px 0 14px;
+      font-size:20px;
       letter-spacing:-.01em;
-      padding-left:12px;
-      border-left:4px solid rgba(59,130,246,.55);
+      padding:8px 12px;
+      border-left:6px solid rgba(59,130,246,.75);
+      background:linear-gradient(90deg, rgba(10,91,211,.10), transparent);
+      border-radius:12px;
     }
     .content h3{
-      margin:18px 0 8px;
-      font-size:15px;
+      margin:22px 0 10px;
+      font-size:16px;
       letter-spacing:-.01em;
     }
-    .content ul{margin:10px 0 14px 18px;line-height:1.85}
+    .content ul, .content ol{
+      margin:14px 0 18px;
+      padding:14px 18px 14px 32px;
+      background:#f6f8ff;
+      border:1px solid rgba(0,0,0,.05);
+      border-radius:14px;
+      line-height:1.9;
+    }
     .content li{margin:6px 0}
-    .content a{color:#0a5bd3;font-weight:900;text-decoration:none}
+    .content a{color:var(--a);font-weight:1000;text-decoration:none}
     .content a:hover{text-decoration:underline}
-    .content hr{border:none;border-top:1px solid rgba(0,0,0,.08);margin:18px 0}
+    .content hr{border:none;border-top:1px solid rgba(0,0,0,.08);margin:22px 0}
+    .content blockquote{
+      margin:16px 0;
+      padding:12px 14px;
+      border-left:5px solid rgba(10,91,211,.65);
+      background:#f9fbff;
+      border-radius:14px;
+      color:rgba(11,18,32,.80);
+    }
+    .content code{
+      background:rgba(10,91,211,.06);
+      border:1px solid rgba(10,91,211,.12);
+      padding:2px 6px;
+      border-radius:8px;
+      font-weight:900;
+    }
+    .content pre{
+      overflow:auto;
+      padding:14px 16px;
+      border-radius:14px;
+      background:#0b1220;
+      color:#e8eefc;
+      box-shadow:0 12px 28px rgba(2,6,23,.18);
+    }
+    .content pre code{background:transparent;border:none;padding:0;color:inherit}
 
-    .note{
-      padding:14px 18px;
-      border-top:1px solid rgba(0,0,0,.06);
-      background: linear-gradient(180deg, rgba(10,91,211,.04), rgba(56,189,248,.03));
-      color:rgba(11,18,32,.74);
-      font-size:12px;
-      line-height:1.7;
+    /* ===== RELATED ===== */
+    .related{
+      max-width:var(--read);
+      margin:10px auto 26px;
+      padding:0 22px 20px;
+    }
+    .relHead{
+      font-size:13px;
+      color:rgba(11,18,32,.78);
+      font-weight:1000;
+      margin:0 0 10px;
+    }
+    .relGrid{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+    }
+    .relCard{
+      display:block;
+      text-decoration:none;
+      color:inherit;
+      border:1px solid rgba(0,0,0,.06);
+      background:#fff;
+      border-radius:16px;
+      padding:12px 12px;
+      box-shadow:0 10px 26px rgba(0,0,0,.06);
+    }
+    .relTitle{font-weight:1000;font-size:14px;line-height:1.4}
+    .relMeta{font-size:12px;color:rgba(11,18,32,.66);margin-top:4px}
+    .relDesc{font-size:12px;color:rgba(11,18,32,.78);margin-top:6px;line-height:1.7}
+    .relCard:hover{transform:translateY(-1px)}
+    @media(min-width:900px){
+      .relGrid{grid-template-columns:1fr 1fr}
     }
 
-    /* footer */
+    /* ===== NOTE & FOOTER ===== */
+    .note{
+      padding:16px 22px;
+      border-top:1px solid rgba(0,0,0,.06);
+      background: linear-gradient(180deg, rgba(10,91,211,.05), rgba(56,189,248,.03));
+      color:rgba(11,18,32,.74);
+      font-size:12px;
+      line-height:1.75;
+    }
     .footer{
       margin-top:14px;
       display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;
       color:rgba(255,255,255,.72);
     }
-    .footer a{color:rgba(255,255,255,.92);text-decoration:none;font-weight:900}
+    .footer a{color:rgba(255,255,255,.92);text-decoration:none;font-weight:1000}
 
-    /* subtle page actions (mobile friendly) */
+    /* ===== MOBILE CTA BAR ===== */
     .bar{
       position:fixed;left:0;right:0;bottom:0;
       padding:10px 12px;
@@ -162,20 +330,17 @@ function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canoni
       display:flex;gap:10px;justify-content:center;
     }
     .btn{
-      max-width:980px;flex:1;
+      max-width:var(--max);flex:1;
       text-align:center;
       padding:12px 14px;border-radius:16px;
       background: linear-gradient(135deg,#0a2a63,#0a5bd3);
-      color:#fff;text-decoration:none;font-weight:900;
+      color:#fff;text-decoration:none;font-weight:1000;
       box-shadow: 0 18px 50px rgba(2,6,23,.28);
     }
     .btn:hover{opacity:.92}
 
     @media(min-width:900px){
-      .h1{font-size:34px}
-      .content{padding:22px 22px 10px}
-      .note{padding:16px 22px}
-      .bar{display:none} /* PCは固定CTA出さない */
+      .bar{display:none}
     }
   </style>
 </head>
@@ -185,9 +350,11 @@ function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canoni
     <header class="hero">
       <div class="heroInner">
         <div class="badge">SIN JAPAN Official Column</div>
-        <h1 class="h1">${title}</h1>
+        <h1 class="h1">${esc(title)}</h1>
         <div class="meta">
-          <span>${isoDate}</span><span class="dot">•</span><span>${category}</span>
+          <span>${esc(isoDate)}</span>
+          <span class="dot">•</span>
+          <span>${esc(category || "")}</span>
         </div>
         <div class="tags">${tagHtml}</div>
 
@@ -199,9 +366,27 @@ function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canoni
     </header>
 
     <main class="card">
-      <article class="content">
+      <div class="toc" id="tocBox" style="display:none;">
+        <div class="tocTop">
+          <h3 class="tocTitle">目次</h3>
+          <button class="tocBtn" id="tocToggle" type="button">開く</button>
+        </div>
+        <ul class="tocList" id="tocList"></ul>
+      </div>
+
+      <article class="content" id="article">
         ${bodyHtml}
       </article>
+
+      ${
+        relatedHtml
+          ? `<section class="related">
+              <h3 class="relHead">関連記事</h3>
+              <div class="relGrid">${relatedHtml}</div>
+            </section>`
+          : ""
+      }
+
       <div class="note">
         ※本記事は一般的情報です。契約・税務・法務は個別事情で変わるため、最終判断は専門家へ。<br/>
         SIN JAPAN（物流・人材・IT）に関するご相談はお問い合わせから。
@@ -217,43 +402,54 @@ function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canoni
   <div class="bar">
     <a class="btn" href="https://sinjapan.work" target="_blank" rel="noopener">見積・お問い合わせ</a>
   </div>
+
+  <script>
+    (function(){
+      const article = document.getElementById("article");
+      if(!article) return;
+
+      // H2にIDを付与して目次生成
+      const h2s = Array.from(article.querySelectorAll("h2"));
+      if(h2s.length === 0) return;
+
+      const tocBox = document.getElementById("tocBox");
+      const tocList = document.getElementById("tocList");
+      const tocToggle = document.getElementById("tocToggle");
+
+      const slugify = (s)=> (s||"")
+        .toLowerCase()
+        .replace(/[^a-z0-9\\u3040-\\u30ff\\u3400-\\u9fff\\s-]/g,"")
+        .replace(/\\s+/g,"-")
+        .replace(/-+/g,"-")
+        .replace(/^-|-$/g,"")
+        .slice(0,60);
+
+      const used = new Set();
+      const items = h2s.map((h2, idx)=>{
+        const text = (h2.textContent||"").trim();
+        let id = slugify(text) || ("sec-" + (idx+1));
+        while(used.has(id)) id = id + "-" + (idx+1);
+        used.add(id);
+        h2.id = id;
+        return { id, text };
+      });
+
+      tocList.innerHTML = items.map(x =>
+        '<li><a href="#' + x.id + '">' + x.text.replace(/</g,"&lt;").replace(/>/g,"&gt;") + '</a></li>'
+      ).join("");
+
+      tocBox.style.display = "block";
+
+      let open = false;
+      const set = ()=>{
+        open = !open;
+        tocToggle.textContent = open ? "閉じる" : "開く";
+        tocList.style.display = open ? "block" : "none";
+      };
+      tocList.style.display = "none";
+      tocToggle.addEventListener("click", set);
+    })();
+  </script>
 </body>
 </html>`;
-}
-import OpenAI from "openai";
-
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-async function aiGenerateArticleJSON({ category, isoDate }) {
-  const prompt = `
-あなたはSIN JAPAN公式コラムの編集長。SEOで勝ち、問い合わせに繋がる実務記事を作る。
-
-【カテゴリ】${category}
-【公開日】${isoDate}
-
-【出力】JSONのみ（他の文章禁止）
-{
-  "title": "32字前後。検索意図に刺さる断定タイトル",
-  "description": "80〜110字のメタ説明",
-  "tags": ["${category}", "関連タグ2〜5個"],
-  "slugHint": "英数字とハイフンのみ",
-  "bodyMarkdown": "1500〜2200字。H2/H3。チェックリスト/見積テンプレ/KPI必須"
-}
-
-【必須ブロック】
-- チェックリスト（7〜12項目）
-- 見積依頼テンプレ（箇条書き）
-- 運用KPI（3〜6個）
-- 注意：契約/法務/税務は一般論で免責
-
-生成せよ。
-`.trim();
-
-  const res = await client.responses.create({
-    model: "gpt-4.1-mini",
-    input: prompt,
-  });
-
-  const text = res.output_text || "";
-  return JSON.parse(text);
 }
