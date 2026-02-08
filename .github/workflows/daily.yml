@@ -1,6 +1,7 @@
 name: daily-generate
 permissions:
   contents: write
+
 on:
   schedule:
     - cron: "0 22 * * *" # JST 07:00（UTC 22:00）
