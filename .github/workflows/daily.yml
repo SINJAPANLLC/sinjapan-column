@@ -11,9 +11,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -30,12 +31,17 @@ jobs:
       - name: Generate article (OpenAI)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: node scripts/generate.mjs
+        run: node scripts/generate.mjs --n 1
 
       - name: Commit & Push
         run: |
           git config user.name "sinjapan-bot"
           git config user.email "bot@sinjapan.work"
-          git add public/feed/index.json public/**/*.html public/sitemap.xml || true
+
+          git add public/feed/index.json public/feed/articles/**/*.json public/**/*.html public/sitemap.xml || true
           git commit -m "daily: generate" || exit 0
-          git push
+
+          # 競合回避：先にリモート取り込む
+          git pull --rebase origin main
+
+          git push origin main
