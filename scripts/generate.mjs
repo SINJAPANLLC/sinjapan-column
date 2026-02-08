@@ -1,38 +1,64 @@
-// scripts/generate.mjs
 import fs from "fs";
 import path from "path";
 import OpenAI from "openai";
 
+/**
+ * SIN JAPAN Column Generator (Perfect Edition)
+ * - Weighted categories (Truck dispatch heavy)
+ * - Random daily 10 (Actions)
+ * - Robust JSON parse (strip codefences, extract first JSON)
+ * - Unique slug (avoid same-day collisions)
+ * - Save source JSON for --all rebuild
+ * - Sitemap + feed index
+ */
+
+// ====== CONFIG ======
 const ROOT = process.cwd();
 const PUBLIC_DIR = path.join(ROOT, "public");
 const FEED_DIR = path.join(PUBLIC_DIR, "feed");
 const FEED_JSON = path.join(FEED_DIR, "index.json");
 const ARTICLES_DIR = path.join(FEED_DIR, "articles");
-const SITE_BASE = "https://sinjapanllc.github.io/sinjapan-column/"; // Pagesのルート
-const CANON_BASE = SITE_BASE; // canonicalも同じでOK
 
-const CATEGORIES = [
-  "軽貨物",
-  "一般貨物",
-  "トラック手配",
-  "３PL",
-  "車両レンタル",
-  "資金調達",
-  "代理店",
-  "BPO",
-  "人材紹介",
-  "システム開発",
-  "プラットフォーム開発",
-  "アプリ開発",
-  "WEB制作",
-  "IT補助金",
-  "ライブ配信",
-  "SEOマーケティング",
-  "SNSマーケティング",
-  "AIOマーケティング",
-  "不動産",
+const SITE_BASE = "https://sinjapanllc.github.io/sinjapan-column/"; // GitHub Pages root
+const CANON_BASE = SITE_BASE;
+
+// OpenAI model (cheap & good for JSON)
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+
+// ====== WEIGHTED CATEGORY PICKER ======
+const CATEGORY_WEIGHTS = [
+  { name: "トラック手配", w: 6 }, // ← 多め（強化）
+  { name: "一般貨物", w: 2 },
+  { name: "軽貨物", w: 2 },
+  { name: "3PL", w: 1 },
+  { name: "車両レンタル", w: 1 },
+  { name: "資金調達", w: 1 },
+  { name: "代理店", w: 1 },
+  { name: "BPO", w: 1 },
+  { name: "人材紹介", w: 1 },
+  { name: "システム開発", w: 1 },
+  { name: "プラットフォーム開発", w: 1 },
+  { name: "アプリ開発", w: 1 },
+  { name: "WEB制作", w: 1 },
+  { name: "IT補助金", w: 1 },
+  { name: "ライブ配信", w: 1 },
+  { name: "SEOマーケティング", w: 1 },
+  { name: "SNSマーケティング", w: 1 },
+  { name: "AIOマーケティング", w: 1 },
+  { name: "不動産", w: 1 },
 ];
 
+function pickCategoryWeighted() {
+  const total = CATEGORY_WEIGHTS.reduce((s, x) => s + x.w, 0);
+  let r = Math.random() * total;
+  for (const x of CATEGORY_WEIGHTS) {
+    r -= x.w;
+    if (r <= 0) return x.name;
+  }
+  return CATEGORY_WEIGHTS[0].name;
+}
+
+// ====== FS HELPERS ======
 function ensureDir(p) {
   fs.mkdirSync(p, { recursive: true });
 }
@@ -51,6 +77,7 @@ function writeJson(file, obj) {
   fs.writeFileSync(file, JSON.stringify(obj, null, 2), "utf8");
 }
 
+// ====== DATE / SLUG ======
 function ymd(date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -62,17 +89,23 @@ function toIso(date = new Date()) {
   return ymd(date);
 }
 
-function slugifyHint(s) {
-  return String(s || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\- ]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/\-+/g, "-")
-    .slice(0, 80) || "article";
+function rand4() {
+  return Math.random().toString(16).slice(2, 6); // 4 hex chars
 }
 
-// 超軽量Markdown→HTML（依存なし）
+function slugifyHint(s) {
+  return (
+    String(s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\- ]/g, "")
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/\-+/g, "-")
+      .slice(0, 70) || "article"
+  );
+}
+
+// ====== SUPER LIGHT MD -> HTML (no deps) ======
 function mdToHtml(md = "") {
   const esc = (s) =>
     String(s ?? "")
@@ -150,19 +183,20 @@ function mdToHtml(md = "") {
   return out.join("\n");
 
   function inline(s) {
-    // code
+    // inline code
     s = s.replace(/`([^`]+)`/g, (_, a) => `<code>${a}</code>`);
     // bold
     s = s.replace(/\*\*([^*]+)\*\*/g, (_, a) => `<strong>${a}</strong>`);
-    // link (markdown)
+    // markdown link: [text](url)
     s = s.replace(/$begin:math:display$([^$end:math:display$]+)\]$begin:math:text$([^)]+)$end:math:text$/g, (_, text, url) => {
-      const safeUrl = url.replace(/"/g, "%22");
+      const safeUrl = String(url).replace(/"/g, "%22");
       return `<a href="${safeUrl}" target="_blank" rel="noopener">${text}</a>`;
     });
     return s;
   }
 }
 
+// ====== HTML TEMPLATE ======
 function wrapHtml({
   title,
   description,
@@ -262,7 +296,6 @@ function wrapHtml({
         linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #f6f8ff 140%);
       min-height:100vh;
     }
-
     .wrap{max-width:var(--max);margin:0 auto;padding:22px 16px 78px}
 
     .hero{
@@ -326,6 +359,36 @@ function wrapHtml({
       overflow:hidden;
     }
 
+    .toc{
+      background:#fff;
+      border:1px solid rgba(0,0,0,.06);
+      border-radius:16px;
+      padding:14px 16px;
+    }
+    .tocTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .tocTitle{margin:0;font-size:13px;color:rgba(11,18,32,.78);font-weight:1000}
+    .tocBtn{
+      border:1px solid rgba(0,0,0,.10);
+      background:#fff;
+      border-radius:12px;
+      padding:8px 10px;
+      font-size:12px;
+      cursor:pointer;
+      font-weight:900;
+    }
+    .tocList{margin:10px 0 0;padding:0;list-style:none}
+    .tocList a{
+      display:block;
+      padding:7px 0;
+      text-decoration:none;
+      color:var(--a);
+      font-size:13px;
+      font-weight:900;
+      border-bottom:1px dashed rgba(0,0,0,.06);
+    }
+    .tocList li:last-child a{border-bottom:none}
+    .tocList a:hover{text-decoration:underline}
+
     .content{
       max-width:var(--read);
       margin:0 auto;
@@ -347,6 +410,7 @@ function wrapHtml({
       border-radius:14px;
       line-height:1.9;
     }
+    .content li{margin:6px 0}
     .content a{color:var(--a);font-weight:1000;text-decoration:none}
     .content a:hover{text-decoration:underline}
     .content hr{border:none;border-top:1px solid rgba(0,0,0,.08);margin:22px 0}
@@ -433,7 +497,7 @@ function wrapHtml({
       </div>
     </header>
 
-    <main class="card">
+    <main class="card" id="cardRoot">
       <article class="content">
         ${bodyHtml}
       </article>
@@ -464,7 +528,7 @@ function wrapHtml({
   </div>
 
   <script>
-    // 目次（h2を拾う・無いなら何もしない）
+    // TOC: collect h2
     (function(){
       const h2s = Array.from(document.querySelectorAll(".content h2"));
       if(!h2s.length) return;
@@ -494,7 +558,7 @@ function wrapHtml({
         btn.textContent = open ? "閉じる" : "開く";
       });
 
-      const card = document.querySelector(".card");
+      const card = document.getElementById("cardRoot");
       card.insertBefore(wrap, card.firstChild);
     })();
   </script>
@@ -502,10 +566,12 @@ function wrapHtml({
 </html>`;
 }
 
+// ====== RELATED / FEED / SITEMAP ======
 function buildRelated(feed, currentSlug) {
   const cur = feed.find((x) => x.slug === currentSlug);
   const sameCat = cur?.category;
-  const related = feed
+
+  return feed
     .filter((x) => x.slug !== currentSlug)
     .filter((x) => (sameCat ? x.category === sameCat : true))
     .slice(0, 6)
@@ -516,15 +582,13 @@ function buildRelated(feed, currentSlug) {
       category: x.category,
       description: x.description,
     }));
-  return related;
 }
 
 function updateFeed(feed, item) {
   const key = item.slug;
   const next = [item, ...feed.filter((x) => x.slug !== key)];
-  // date desc
   next.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  return next.slice(0, 300); // 上限（無限肥大防止）
+  return next.slice(0, 500);
 }
 
 function writeSitemap(feed) {
@@ -544,16 +608,39 @@ ${urls
   fs.writeFileSync(path.join(PUBLIC_DIR, "sitemap.xml"), body, "utf8");
 }
 
-// ===== OpenAI =====
+function articlePathFromSlug(slug) {
+  return path.join(PUBLIC_DIR, slug.replace(/^\//, ""));
+}
+
+function sourceJsonPathFromSlug(slug) {
+  // 2026/02/xxx.html -> public/feed/articles/2026/02/xxx.json
+  const p = slug.replace(/\.html$/, ".json");
+  return path.join(ARTICLES_DIR, p);
+}
+
+// ====== OPENAI ======
 function requireApiKey() {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
-    throw new Error("OPENAI_API_KEY が未設定です（GitHub Actions secretsに設定してね）");
+    throw new Error("OPENAI_API_KEY が未設定です（ローカルは export、Actionsは Secretsへ）");
   }
   return key;
 }
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" });
+
+function extractJsonObject(text) {
+  let raw = String(text || "").trim();
+
+  // strip ```json ... ```
+  raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
+
+  // attempt to find first {...}
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (m) raw = m[0];
+
+  return raw;
+}
 
 async function aiGenerateArticleJSON({ category, isoDate }) {
   requireApiKey();
@@ -564,12 +651,12 @@ async function aiGenerateArticleJSON({ category, isoDate }) {
 【カテゴリ】${category}
 【公開日】${isoDate}
 
-【出力】JSONのみ（他の文章禁止）
+【出力】JSONのみ（他の文章禁止。コードフェンス禁止）
 {
   "title": "32字前後。検索意図に刺さる断定タイトル",
   "description": "80〜110字のメタ説明",
   "tags": ["${category}", "関連タグ2〜5個"],
-  "slugHint": "英数字とハイフンのみ",
+  "slugHint": "英数字とハイフンのみ（例: truck-dispatch-checklist）",
   "bodyMarkdown": "1500〜2200字。H2/H3。チェックリスト/見積テンプレ/KPI必須"
 }
 
@@ -583,52 +670,22 @@ async function aiGenerateArticleJSON({ category, isoDate }) {
 `.trim();
 
   const res = await client.responses.create({
-    model: "gpt-4.1-mini",
+    model: OPENAI_MODEL,
     input: prompt,
   });
 
   const text = res.output_text || "";
-    // ---- robust JSON parse (strip code fences / extra text) ----
-  let raw = (text || "").trim();
-
-  // remove ```json ... ``` fences
-  raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-
-  // if model still adds extra text, extract first JSON object
-  const m = raw.match(/\{[\s\S]*\}/);
-  if (m) raw = m[0];
+  const raw = extractJsonObject(text);
 
   try {
     return JSON.parse(raw);
   } catch (e) {
-    console.error("RAW OUTPUT (for debug):\n", text);
+    console.error("RAW OUTPUT (debug):\n", text);
     throw e;
   }
-
 }
 
-// ===== CLI =====
-function parseArgs(argv) {
-  const args = { all: false, n: 1, category: null };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--all") args.all = true;
-    if (a === "--n") args.n = Math.max(1, parseInt(argv[i + 1] || "1", 10) || 1), i++;
-    if (a === "--category") args.category = argv[i + 1] || null, i++;
-  }
-  return args;
-}
-
-function articlePathFromSlug(slug) {
-  return path.join(PUBLIC_DIR, slug.replace(/^\//, ""));
-}
-
-function sourceJsonPathFromSlug(slug) {
-  // 2026/02/xxx.html -> public/feed/articles/2026/02/xxx.json
-  const p = slug.replace(/\.html$/, ".json");
-  return path.join(ARTICLES_DIR, p);
-}
-
+// ====== RENDER ======
 async function renderOneFromSource({ slug, source, feed }) {
   const bodyHtml = mdToHtml(source.bodyMarkdown || "");
   const canonicalUrl = CANON_BASE + slug.replace(/^\//, "");
@@ -655,9 +712,12 @@ async function generateNew({ category, isoDate, feed }) {
   const j = await aiGenerateArticleJSON({ category, isoDate });
 
   const slugHint = slugifyHint(j.slugHint || category);
+
   const y = isoDate.slice(0, 4);
   const m = isoDate.slice(5, 7);
-  const slug = `${y}/${m}/${slugHint}-${isoDate}.html`;
+
+  // Unique slug: same day collision-safe
+  const slug = `${y}/${m}/${slugHint}-${isoDate}-${rand4()}.html`;
 
   const source = {
     title: j.title,
@@ -669,13 +729,13 @@ async function generateNew({ category, isoDate, feed }) {
     bodyMarkdown: j.bodyMarkdown,
   };
 
-  // 元データ保存（これが “--all” の根拠）
+  // Save source json (for --all rebuild)
   writeJson(sourceJsonPathFromSlug(slug), source);
 
-  // HTML出力
+  // Render HTML
   const outPath = await renderOneFromSource({ slug, source, feed });
 
-  // feed item
+  // Feed item
   const item = {
     title: source.title,
     slug: source.slug,
@@ -688,6 +748,24 @@ async function generateNew({ category, isoDate, feed }) {
   return { outPath, item, source };
 }
 
+// ====== CLI ======
+function parseArgs(argv) {
+  const args = { all: false, n: 1, category: null };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--all") args.all = true;
+    if (a === "--n") {
+      args.n = Math.max(1, parseInt(argv[i + 1] || "1", 10) || 1);
+      i++;
+    }
+    if (a === "--category") {
+      args.category = argv[i + 1] || null;
+      i++;
+    }
+  }
+  return args;
+}
+
 async function main() {
   ensureDir(FEED_DIR);
   ensureDir(ARTICLES_DIR);
@@ -698,14 +776,13 @@ async function main() {
   let feed = readJsonSafe(FEED_JSON, []);
   if (!Array.isArray(feed)) feed = [];
 
-  // --all: 保存済みsource jsonから “全再レンダー”
+  // --all: rebuild HTML only from saved source json (safe)
   if (args.all) {
-    // feedに載ってるslugを全走査し、sourceがあれば再レンダー
     for (const it of feed) {
       const slug = it.slug;
       const srcPath = sourceJsonPathFromSlug(slug);
       const source = readJsonSafe(srcPath, null);
-      if (!source) continue; // 過去分でsource無いものはスキップ（今後は作られる）
+      if (!source) continue;
       await renderOneFromSource({ slug, source, feed });
     }
     writeSitemap(feed);
@@ -716,12 +793,8 @@ async function main() {
   const n = args.n || 1;
 
   for (let i = 0; i < n; i++) {
-    const category =
-      args.category ||
-      CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-
-    const { outPath, item } = await generateNew({ category, isoDate, feed });
-
+    const category = args.category || pickCategoryWeighted();
+    const { item } = await generateNew({ category, isoDate, feed });
     feed = updateFeed(feed, item);
     console.log("Generated:", item.slug);
   }
