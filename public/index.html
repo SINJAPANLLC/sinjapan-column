@@ -1,49 +1,34 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>sinjapan-column</title>
-  <meta name="robots" content="index,follow" />
-  <style>
-    body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;margin:40px}
-    h1{font-size:32px;margin:0 0 10px}
-    .meta{color:#666;margin:0 0 20px}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
-    a.card{display:block;border:1px solid #eee;border-radius:12px;padding:14px;text-decoration:none;color:#111}
-    a.card:hover{border-color:#ccc}
-    .title{font-size:16px;font-weight:700;line-height:1.35;margin:0 0 8px}
-    .date{font-size:12px;color:#666}
-    .slug{font-size:12px;color:#999;margin-top:6px;word-break:break-all}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sinjapan-column</title>
+<style>
+body{font-family:sans-serif;margin:40px}
+.card{border:1px solid #ddd;padding:12px;margin:12px 0}
+</style>
 </head>
 <body>
-  <h1>sinjapan-column</h1>
-  <p class="meta">最新記事一覧（自動生成）</p>
-  <div id="list" class="grid"></div>
+<h1>sinjapan-column</h1>
+<div id="list"></div>
 
-  <script>
-    fetch('./feed/index.json', {cache:'no-store'})
-      .then(r => r.json())
-      .then(items => {
-        const el = document.getElementById('list');
-        items.slice(0, 60).forEach(it => {
-          const a = document.createElement('a');
-          a.className = 'card';
-          a.href = it.url || it.path || it.slug || '#';
-          a.innerHTML = `
-            <div class="title">${(it.title||it.h1||it.slug||'').toString()}</div>
-            <div class="date">${(it.date||it.publishedAt||'').toString()}</div>
-            <div class="slug">${(it.slug||it.url||it.path||'').toString()}</div>
-          `;
-          el.appendChild(a);
-        });
-      })
-      .catch(err => {
-        document.getElementById('list').innerHTML =
-          '<p style="color:#c00">feed/index.json を読み込めませんでした（パス確認）</p>';
-        console.error(err);
-      });
-  </script>
+<script>
+fetch("feed/index.json")
+.then(r=>r.json())
+.then(data=>{
+  const el=document.getElementById("list");
+  data.forEach(a=>{
+    const div=document.createElement("div");
+    div.className="card";
+    div.innerHTML=`
+      <a href="${a.slug}"><h3>${a.title}</h3></a>
+      <div>${a.date} / ${a.category}</div>
+      <p>${a.description}</p>
+    `;
+    el.appendChild(div);
+  });
+});
+</script>
 </body>
 </html>
