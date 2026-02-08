@@ -98,3 +98,21 @@ function escape(s){
     .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
     .replaceAll('"',"&quot;").replaceAll("'","&#039;");
 }
+// sitemap.xml 生成（Googleに更新を拾わせる）
+const SITE_BASE = "https://sinjapanllc.github.io/sinjapan-column/public/";
+
+const urls = feed.map(a => {
+  return `  <url>
+    <loc>${SITE_BASE}${a.slug}</loc>
+    <lastmod>${a.date}</lastmod>
+  </url>`;
+}).join("\n");
+
+const sitemapXml =
+`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>
+`;
+
+fs.writeFileSync(path.join(OUT_DIR, "sitemap.xml"), sitemapXml, "utf8");
