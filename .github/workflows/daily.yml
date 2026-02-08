@@ -24,6 +24,6 @@ jobs:
         run: |
           git config user.name "sinjapan-bot"
           git config user.email "bot@sinjapan.work"
-          git add public/feed/index.json public/**/*.html
+          git add public/feed/index.json public/**/*.html public/sitemap.xml
           git commit -m "daily: generate" || exit 0
           git push
