@@ -220,3 +220,40 @@ function wrapHtml({title, description, bodyHtml, isoDate, category, tags, canoni
 </body>
 </html>`;
 }
+import OpenAI from "openai";
+
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+async function aiGenerateArticleJSON({ category, isoDate }) {
+  const prompt = `
+あなたはSIN JAPAN公式コラムの編集長。SEOで勝ち、問い合わせに繋がる実務記事を作る。
+
+【カテゴリ】${category}
+【公開日】${isoDate}
+
+【出力】JSONのみ（他の文章禁止）
+{
+  "title": "32字前後。検索意図に刺さる断定タイトル",
+  "description": "80〜110字のメタ説明",
+  "tags": ["${category}", "関連タグ2〜5個"],
+  "slugHint": "英数字とハイフンのみ",
+  "bodyMarkdown": "1500〜2200字。H2/H3。チェックリスト/見積テンプレ/KPI必須"
+}
+
+【必須ブロック】
+- チェックリスト（7〜12項目）
+- 見積依頼テンプレ（箇条書き）
+- 運用KPI（3〜6個）
+- 注意：契約/法務/税務は一般論で免責
+
+生成せよ。
+`.trim();
+
+  const res = await client.responses.create({
+    model: "gpt-4.1-mini",
+    input: prompt,
+  });
+
+  const text = res.output_text || "";
+  return JSON.parse(text);
+}
