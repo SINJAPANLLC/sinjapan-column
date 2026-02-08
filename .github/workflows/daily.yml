@@ -1,0 +1,27 @@
+name: daily-generate
+
+on:
+  schedule:
+    - cron: "0 22 * * *" # JST 07:00（UTC 22:00）
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate article
+        run: node scripts/generate.mjs
+
+      - name: Commit & Push
+        run: |
+          git config user.name "sinjapan-bot"
+          git config user.email "bot@sinjapan.work"
+          git add public/feed/index.json public/**/*.html
+          git commit -m "daily: generate" || exit 0
+          git push
