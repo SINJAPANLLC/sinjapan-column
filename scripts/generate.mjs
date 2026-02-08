@@ -588,7 +588,23 @@ async function aiGenerateArticleJSON({ category, isoDate }) {
   });
 
   const text = res.output_text || "";
-  return JSON.parse(text);
+    // ---- robust JSON parse (strip code fences / extra text) ----
+  let raw = (text || "").trim();
+
+  // remove ```json ... ``` fences
+  raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+
+  // if model still adds extra text, extract first JSON object
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (m) raw = m[0];
+
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error("RAW OUTPUT (for debug):\n", text);
+    throw e;
+  }
+
 }
 
 // ===== CLI =====
